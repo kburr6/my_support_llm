@@ -1,0 +1,59 @@
+# docker-compose.yml
+
+services:
+  # Service 1: The PostgreSQL Database with pgvector
+  db:
+    image: ankane/pgvector:latest
+    container_name: pgvector-db-compose
+    environment:
+      - POSTGRES_DB=vector_db
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
+  # Service 2: The Ollama Server
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama-compose
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+    # This section is for deploying on machines with NVIDIA GPUs for acceleration.
+    # If you don't have an NVIDIA GPU, you can remove the 'deploy' section.
+   # deploy:
+   #   resources:
+   #     reservations:
+   #       devices:
+   #         - driver: nvidia
+   #           count: 1
+   #           capabilities: [gpu]
+
+  # Service 3: Your Streamlit Application
+  app:
+    # 'build: .' tells Docker Compose to look for a Dockerfile in the current directory and build it.
+    build: .
+    container_name: support-app-compose
+    ports:
+      - "8501:8501"
+    # 'depends_on' ensures that the 'db' and 'ollama' services are started before the 'app' service.
+    depends_on:
+      - db
+      - ollama
+    # This makes the app restart automatically if it crashes.
+    restart: unless-stopped
+    # We pass the environment variable to the container so it knows how to connect to Ollama.
+    environment:
+      - OLLAMA_HOST=ollama
+
+# Define named volumes for persistent data storage.
+# This ensures that your database data and downloaded Ollama models are not lost
+# when you stop and restart the containers.
+volumes:
+  pg_data:
+  ollama_data:

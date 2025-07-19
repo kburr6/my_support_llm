@@ -1,0 +1,15 @@
+# requirements.txt
+langchain
+langchain-community
+langchain-core
+streamlit
+ollama
+sentence-transformers
+psycopg2-binary
+pgvector
+pypdf
+unstructured
+python-docx
+slack_sdk
+docx2txt
+matplotlib
