@@ -31,6 +31,7 @@ from backend import (
     add_slack_dir_to_db,
     add_directory_to_db,
     delete_all_data,
+    initialize_database,
     LLM_MODEL
 )
 
@@ -48,6 +49,8 @@ st.set_page_config(
 
 st.title("🤖 Product Support AI Assistant")
 st.markdown("Ask questions about your documents, manage your knowledge base, and get accurate answers.")
+
+initialize_database()
 
 # --- NAVIGATION ---
 TABS = [

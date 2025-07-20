@@ -45,40 +45,98 @@ def get_db_connection():
         host="db",       #change to db for docker file (localhost otherwise)
         port="5432"
     )
+    
+def initialize_database():
+    """
+    Checks if the cmetadata column in the LangChain table is of type JSONB
+    and alters it if it's not. This makes the check idempotent.
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Query to check the data type of the cmetadata column
+        check_type_query = """
+        SELECT data_type FROM information_schema.columns
+        WHERE table_name = 'langchain_pg_embedding' AND column_name = 'cmetadata';
+        """
+        
+        cur.execute(check_type_query)
+        result = cur.fetchone()
+
+        # If the table/column exists and the type is 'json', alter it.
+        if result and result[0] == 'json':
+            print("Detected 'cmetadata' column with incorrect 'json' type. Altering to 'jsonb'...")
+            alter_query = "ALTER TABLE langchain_pg_embedding ALTER COLUMN cmetadata TYPE jsonb USING cmetadata::text::jsonb;"
+            cur.execute(alter_query)
+            conn.commit()
+            print("Successfully altered 'cmetadata' column to 'jsonb'.")
+        elif not result:
+            print("LangChain tables not yet created. Skipping column type check.")
+        else:
+            print("'cmetadata' column is already of the correct 'jsonb' type.")
+
+    except Exception as e:
+        print(f"Error during database initialization check: {e}")
+        if conn:
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
 
 def list_all_documents():
     """
-    Lists all unique documents. For Curated Q&A, it shows the question text
-    instead of the generic source name.
+    Lists all unique documents. If the LangChain table doesn't exist yet,
+    it returns an empty list instead of crashing.
     """
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    # This advanced SQL query uses a LEFT JOIN and a CASE statement.
-    query = f"""
-    SELECT DISTINCT
-        emb.cmetadata->>'source_doc_id' as id,
-        CASE
-            WHEN emb.cmetadata->>'source_doc_name' = 'Curated Q&A'
-            THEN 'Q: ' || cqa.question -- If it's a Q&A, show the question text
-            ELSE emb.cmetadata->>'source_doc_name' -- Otherwise, show the filename
-        END as name
-    FROM
-        langchain_pg_embedding as emb
-    LEFT JOIN
-        curated_qa as cqa ON (emb.cmetadata->>'source_doc_id')::uuid = cqa.id
-    WHERE
-        emb.collection_id = (SELECT uuid FROM langchain_pg_collection WHERE name = '{COLLECTION_NAME}');
-    """
-    
-    cur.execute(query)
-    # The order of columns in the result is now id, name
-    documents = cur.fetchall()
-    cur.close()
-    conn.close()
-    
-    # We switched the order of id and name in the SELECT, so adjust the unpacking here
-    return [{"id": doc[0], "name": doc[1]} for doc in documents]
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # First, check if the embedding table exists in the public schema.
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name = 'langchain_pg_embedding'
+            );
+        """)
+        table_exists = cur.fetchone()[0]
+
+        # If the table does not exist, return an empty list immediately.
+        if not table_exists:
+            print("LangChain embedding table does not exist yet. Returning empty list.")
+            return []
+
+        # If the table exists, proceed with the original complex query.
+        query = f"""
+        SELECT DISTINCT
+            emb.cmetadata->>'source_doc_id' as id,
+            CASE
+                WHEN emb.cmetadata->>'source_doc_name' = 'Curated Q&A'
+                THEN 'Q: ' || cqa.question
+                ELSE emb.cmetadata->>'source_doc_name'
+            END as name
+        FROM
+            langchain_pg_embedding as emb
+        LEFT JOIN
+            curated_qa as cqa ON (emb.cmetadata->>'source_doc_id')::uuid = cqa.id
+        WHERE
+            emb.collection_id = (SELECT uuid FROM langchain_pg_collection WHERE name = '{COLLECTION_NAME}');
+        """
+        cur.execute(query)
+        documents = cur.fetchall()
+        
+        return [{"id": doc[0], "name": doc[1]} for doc in documents]
+
+    except Exception as e:
+        print(f"Error listing documents: {e}")
+        return [] # Return an empty list on any other error as well
+    finally:
+        if conn:
+            conn.close()
 
 
 def delete_document_by_id(doc_id: str):
@@ -133,25 +191,18 @@ def delete_document_by_id(doc_id: str):
 # Memoized function to load embeddings only once
 @st.cache_resource
 def get_embeddings():
-    """Loads the embedding model from the local path inside the Docker image."""
-    config = get_ai_config()
-    model_name = config.get('embedding_model', 'BAAI/bge-large-en-v1.5')
+    """Loads the embedding model from the local, absolute path inside the Docker image."""
     
-    # We now specify the `cache_folder` to point to the directory where
-    # our Dockerfile downloaded the model.
-    model_kwargs = {'device': 'cpu'} # Use CPU for embeddings in the container
-    encode_kwargs = {'normalize_embeddings': True}
+    # --- THIS IS THE CRITICAL CHANGE ---
+    # The 'model_name' is now the LOCAL FOLDER PATH inside the container.
+    # This tells HuggingFaceEmbeddings to load it directly from disk and not
+    # attempt to download anything from the internet.
+    local_model_path = "/app/embedding_model"
     
-    print(f"Loading embedding model '{model_name}' from local models directory...")
+    print(f"Loading embedding model from local path: {local_model_path}")
     
-    embeddings = HuggingFaceEmbeddings(
-        model_name=model_name,
-        cache_folder="./models", # Point to the local folder in the container
-        model_kwargs=model_kwargs,
-        encode_kwargs=encode_kwargs
-    )
-    
-    return embeddings
+    # We no longer need cache_folder, as the path is absolute.
+    return HuggingFaceEmbeddings(model_name=local_model_path)
 
 def get_ai_config():
     """Retrieves the current AI configuration from the database."""

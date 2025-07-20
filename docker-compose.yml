@@ -1,7 +1,7 @@
-# docker-compose.yml
+# docker-compose.yml (Final Version)
 
 services:
-  # Service 1: The PostgreSQL Database with pgvector
+  # Service 1: The PostgreSQL Database with a robust healthcheck
   db:
     image: ankane/pgvector:latest
     container_name: pgvector-db-compose
@@ -10,10 +10,21 @@ services:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
     volumes:
+      # This volume persists the actual database data across restarts.
       - pg_data:/var/lib/postgresql/data
+      # This volume mounts our entire db-init folder into the initialization directory.
+      # The PostgreSQL startup script will then find and execute any .sql files inside.
+      - ./db-init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     restart: unless-stopped
+    healthcheck:
+      # This command checks if the 'ai_configuration' table exists.
+      # It will only succeed after our setup.sql script has finished running.
+      test: ["CMD-SHELL", "psql -U user -d vector_db -c 'SELECT 1 FROM ai_configuration'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10 # Give the setup script up to 50 seconds to complete
 
   # Service 2: The Ollama Server
   ollama:
@@ -24,35 +35,40 @@ services:
     ports:
       - "11434:11434"
     restart: unless-stopped
-    # This section is for deploying on machines with NVIDIA GPUs for acceleration.
-    # If you don't have an NVIDIA GPU, you can remove the 'deploy' section.
-   # deploy:
-   #   resources:
-   #     reservations:
-   #       devices:
-   #         - driver: nvidia
-   #           count: 1
-   #           capabilities: [gpu]
+    # The 'deploy' section for GPU acceleration is commented out.
+    # Uncomment it if you are deploying on a machine with a compatible NVIDIA GPU
+    # and have the NVIDIA Container Toolkit installed.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
 
   # Service 3: Your Streamlit Application
   app:
-    # 'build: .' tells Docker Compose to look for a Dockerfile in the current directory and build it.
+    # 'build: .' tells Docker Compose to build the image from the Dockerfile in this directory.
     build: .
     container_name: support-app-compose
     ports:
       - "8501:8501"
-    # 'depends_on' ensures that the 'db' and 'ollama' services are started before the 'app' service.
+    # This 'depends_on' block is crucial for startup order.
     depends_on:
-      - db
-      - ollama
-    # This makes the app restart automatically if it crashes.
+      db:
+        condition: service_healthy # Wait for the db healthcheck to pass before starting.
+      ollama:
+        condition: service_started # Just wait for the ollama service to have started.
     restart: unless-stopped
-    # We pass the environment variable to the container so it knows how to connect to Ollama.
     environment:
-      - OLLAMA_HOST=ollama
+      - OLLAMA_HOST=ollama # This is used by the app to find the ollama container.
+    # This volume is commented out as we are now baking the model into the image.
+    # If you revert to the cache-mounting strategy, uncomment this and adjust the path.
+    # volumes:
+    #   - /mnt/c/Users/YourUser/.cache/huggingface/hub:/root/.cache/huggingface/hub
 
 # Define named volumes for persistent data storage.
-# This ensures that your database data and downloaded Ollama models are not lost
+# This ensures your database and downloaded Ollama models are not lost
 # when you stop and restart the containers.
 volumes:
   pg_data:

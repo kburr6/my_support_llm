@@ -10,12 +10,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Step 4: Copy the model download script into the container
+# Step 4: Copy the model download script
 COPY download_model.py .
 
-# Step 5: Run the download script to "bake" the model into the image.
-# This will download the model and save it inside the '/app/models' directory.
-# This happens only ONCE during the image build.
+# Step 5: Run the download script to bake the model into the image.
+# This will now save the model to '/app/embedding_model'
 RUN python download_model.py
 
 # Step 6: Copy the rest of your application code

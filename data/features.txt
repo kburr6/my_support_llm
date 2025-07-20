@@ -1,0 +1,1 @@
+The new 'Quantum Sync' feature allows for instantaneous data synchronization across all user devices. It operates on a proprietary sub-space channel and requires an active 'Chronos' subscription. The setup process is simple: navigate to Settings -> Quantum Sync and press 'Activate'.
