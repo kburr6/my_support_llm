@@ -66,6 +66,25 @@ services:
     # If you revert to the cache-mounting strategy, uncomment this and adjust the path.
     # volumes:
     #   - /mnt/c/Users/YourUser/.cache/huggingface/hub:/root/.cache/huggingface/hub
+    
+# Service 4: The new Slack Bot Service
+  slack-bot:
+    # It uses the same build as our Streamlit app because they share the same codebase
+    build: .
+    container_name: slack-bot-compose
+    # Load the secrets from the .env file
+    env_file:
+      - .env
+    # The command to start the FastAPI server
+    command: uvicorn slack_bot:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    restart: unless-stopped
 
 # Define named volumes for persistent data storage.
 # This ensures your database and downloaded Ollama models are not lost

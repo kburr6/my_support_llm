@@ -18,7 +18,7 @@ from langchain_community.document_loaders import (
     SlackDirectoryLoader, WebBaseLoader, PyPDFLoader, TextLoader, Docx2txtLoader,
     UnstructuredExcelLoader, UnstructuredPowerPointLoader, CSVLoader, UnstructuredMarkdownLoader
 )
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores.pgvector import PGVector
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.llms import Ollama

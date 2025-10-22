@@ -1,0 +1,9 @@
+Date,Region,Product,UnitsSold,SalePrice
+2024-01-15,North,Gadget A,150,99.99
+2024-01-20,South,Widget B,200,49.50
+2024-02-10,North,Gadget A,120,99.99
+2024-02-18,West,Thing C,75,199.00
+2024-03-05,South,Gadget A,180,95.50
+2024-03-12,East,Widget B,250,50.00
+2024-04-21,North,Thing C,90,205.00
+2024-04-30,West,Widget B,130,49.00

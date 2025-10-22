@@ -1,30 +1,122 @@
-Quick Start: Deployment with Docker Compose
+code
+Markdown
+# AI Support Assistant
 
-This guide will get the entire AI Support Assistant application running on your system.
+This project is a comprehensive, self-hosted, Llama-based RAG (Retrieval-Augmented Generation) system designed for a support team. It allows users to ask questions in natural language and receive accurate answers based on a knowledge base of internal documents, web pages, and other sources.
 
-Prerequisites:
-Docker Desktop installed and running.
-An internet connection for the initial setup.
+The application features a full-featured administrative UI built with Streamlit and can be integrated as an automated bot into a Slack workspace.
 
-Step 1: Launch the Application
-Navigate to the project's root directory in your terminal and run the following command. This will build the application image, download the necessary service images, and start all the containers.
+## Features
 
+- **Core RAG Pipeline:** Uses a local LLM (via Ollama) and a vector database (PostgreSQL + pgvector) to provide accurate, context-aware answers.
+- **Multi-Source Ingestion:** Supports a wide variety of data sources including PDFs, DOCX, XLSX, CSVs, web pages, Slack exports, and entire file directories.
+- **CSV Data Analyst:** A dedicated interface for uploading CSV files and performing natural language Q&A and calculations.
+- **Comprehensive Admin UI:**
+  - **AI Configuration:** Dynamically configure the master prompt, retriever settings, and embedding models.
+  - **Performance Dashboard:** View KPIs, top problem questions, and information gaps at a glance.
+  - **Human-in-the-Loop Workflow:** "Curate" and "Reset" buttons on the dashboard to quickly fix bad answers and clear historical logs.
+  - **Query Inspector:** A detailed "flight recorder" to debug the end-to-end flow of every query.
+- **Slack Bot Integration:** An optional, event-driven bot that can answer questions directly within your Slack workspace.
+
+## Technology Stack
+
+- **LLM Server:** Ollama (running Llama 3)
+- **Database:** PostgreSQL with `pgvector`
+- **Orchestration:** LangChain
+- **UI:** Streamlit
+- **Slack Bot API:** FastAPI
+- **Containerization:** Docker & Docker Compose
+
+---
+
+## Quick Start: Deployment with Docker Compose
+
+This guide will get the entire application stack running on your system. This is a two-step process for the first-time setup.
+
+### Prerequisites
+
+- **Docker Desktop:** Must be installed and running.
+- **Git:** Required to clone the repository.
+- An internet connection for the initial setup.
+
+### Step 1: Clone the Repository
+
+Clone this project to your local machine:
+
+```bash
+git clone <your-repository-url>
+cd <your-repository-folder>
+Step 2: Launch the Application Services
+Navigate to the project's root directory in your terminal and run the following command. This will build the application image, download the necessary service images, and start all the containers. The database will be set up automatically.
+code
+Bash
 docker-compose up --build
-
-The first time you run this, it will take several minutes to download the Python dependencies and the embedding model. You will see a lot of log output from the different services. Wait for the logs to slow down and for the app and db services to show that they are running and healthy.
-
-Step 2: Pull the Language Model
-The application needs a Large Language Model (LLM) to function. You must pull this model into the running Ollama service.
-While the application is running (from Step 1), open a new, separate terminal window, navigate to the same project directory, and run the following command:
-
+What to Expect on First Launch:
+Docker Build: This will take a significant amount of time (potentially 30-60+ minutes depending on your internet connection) as it downloads Python dependencies and the large embedding model (bge-large-en-v1.5).
+Database Initialization: You will see logs from the pgvector-db-compose container as it runs the setup.sql script to create all the tables.
+Wait for the logs from all services to slow down and for the app, db, and ollama services to show that they are running and healthy.
+Step 3: Pull the Language Model (One-Time Manual Step)
+The application needs a Large Language Model (LLM) to function. You must manually pull this model into the running Ollama service.
+While the application is running (from Step 2), open a new, separate terminal window, navigate to the same project directory, and run the following command:
+code
+Bash
 docker-compose exec ollama ollama pull llama3:8b
-
 You will see a progress bar as the llama3:8b model is downloaded. This can take several minutes depending on your internet connection.
-
-That's it!
-
+This step only needs to be performed once after a fresh installation.
+Step 4: Access the Application
 Once the model pull is complete, your application is fully configured. You can now access the user interface by opening a web browser and navigating to:
-
 http://localhost:8501
-
-The database and the downloaded LLM are stored in persistent Docker volumes, so you will only need to perform Step 2 the very first time you set up the project. For all subsequent starts, you can simply run docker-compose up.
+(Optional) Slack Bot Integration Setup
+Follow these steps if you want to connect the application to a Slack workspace.
+Prerequisites
+You must have administrator permissions in your Slack workspace to create a new app.
+You will need to download ngrok for local development and testing.
+Step 1: Create a Slack App
+Go to https://api.slack.com/apps and click "Create New App".
+Choose "From scratch", give it a name (e.g., "Support AI Assistant"), and select your workspace.
+Step 2: Configure Permissions and Events
+OAuth & Permissions:
+Go to the "OAuth & Permissions" page.
+Under "Bot Token Scopes," add the following scopes: chat:write and app_mentions:read.
+Event Subscriptions:
+Go to the "Event Subscriptions" page and toggle it "On".
+Under "Subscribe to bot events," add the app_mention event.
+Install to Workspace:
+Go back to "OAuth & Permissions" and click "Install to Workspace". Authorize it.
+After installing, copy the Bot User OAuth Token (starts with xoxb-...).
+Get Signing Secret:
+Go to the "Basic Information" page.
+Under "App Credentials," copy the Signing Secret.
+Step 3: Configure Your Local Environment
+In the root of the project directory, create a file named .env.
+Add your copied credentials to this file:
+code
+Code
+SLACK_BOT_TOKEN="xoxb-YOUR-BOT-TOKEN-HERE"
+SLACK_SIGNING_SECRET="YOUR-SIGNING-SECRET-HERE"
+Note: This .env file is included in .gitignore and should never be committed to your repository.
+Step 4: Expose Your Bot with ngrok
+Ensure your full application is running via docker-compose up.
+Download and run ngrok in a new terminal, pointing it to the slack-bot service's port (8000) and using the special Docker hostname:
+code
+Bash
+ngrok http host.docker.internal:8000
+ngrok will give you a public HTTPS URL (e.g., https://random-string.ngrok-free.app). Copy this URL.
+Step 5: Finalize Slack Configuration
+Go back to your Slack App's "Event Subscriptions" page.
+In the "Request URL" box, paste your ngrok URL and add /slack/events to the end.
+Example: https://random-string.ngrok-free.app/slack/events
+Slack will verify the URL. You should see a green "Verified" checkmark.
+Click "Save Changes".
+If prompted, reinstall the app to your workspace one more time.
+Step 6: Test the Bot
+In your Slack workspace, go to any channel.
+Invite the bot by typing /invite @YourBotName.
+Ask it a question by mentioning it, for example: @YourBotName how do I reset my password?
+The bot should reply in a thread to your message.
+Daily Usage
+To Start: docker-compose up
+To Stop: docker-compose down
+You only need to use the --build flag when you change Python code, requirements.txt, or the Dockerfile. The downloaded LLM and your database are stored in persistent Docker volumes and will be available automatically on subsequent starts.
+code
+Code

@@ -1,0 +1,3 @@
+bot token: xoxb-9724767779767-9743821494020-8zk1E5h90YtigYTvERTL0sR3
+
+signing secret: d11dbc37b576526be2189585bc3d8baa

@@ -13,3 +13,7 @@ python-docx
 slack_sdk
 docx2txt
 matplotlib
+langchain-text-splitters
+fastapi
+uvicorn[standard]  # The web server that runs our FastAPI app
+python-dotenv      # For managing secret keys safely
